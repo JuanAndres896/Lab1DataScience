@@ -1,0 +1,217 @@
+---
+title: "Laboratorio 1"
+author: "Juan Andres Garcia"
+date: "8 August,2018"
+output: 
+  html_document:
+    theme: simplex
+    code_folding: hide
+---
+<style type="text/css">
+
+body, td {
+   font-size: 14px;
+}
+code.r{
+  font-size: 14px;
+}
+pre {
+  font-size: 14px
+}
+div {
+    text-align: justify;
+    text-justify: inter-word;
+}
+p {
+    font-family: Arial, Helvetica, sans-serif;
+}
+</style>
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(fig.align = "center") 
+library(knitr)
+library(kableExtra)
+library(formattable)
+library(cluster)
+library(rela)
+library(psych)
+options(knitr.table.format = "html")
+options(scipen = 100)
+set.seed(1234)
+```
+#Análisis Exploratorio
+Se tienen dos datasets, uno en el cual se incluye el precio de las casas. Ambos presentan solo variables categóricas y numéricas. El tipo de las variables se muestra a continuación.
+```{r}
+# House Prices: Advanced Regression Techniques
+# Predict sales prices and practice feature engineering, RFs, and gradient boosting
+# 1 Agosto 2018
+
+setwd("~/Sync/DATOS/DATA/LAB1")
+
+test<-read.csv("test.csv")
+train<-read.csv("train.csv")
+sample<-read.csv("sample_submission.csv")
+a<-vector()
+ntrain<-as.data.frame(train$Id)
+colnames(ntrain)<-colnames(train[1])
+for(i in 2:length(train)){
+  if(is.numeric(train[,i])){
+    a<-train[,i]
+    ntrain<-cbind(ntrain,a)
+    colnames(ntrain)[length(ntrain)]<-colnames(train[i])
+  }
+}
+
+
+a<-vector()
+ftrain<-as.data.frame(train$Id)
+colnames(ftrain)<-colnames(train[1])
+for(i in 2:length(train)){
+  if(is.factor(train[,i])){
+    a<-train[,i]
+    ftrain<-cbind(ftrain,a)
+    colnames(ftrain)[length(ftrain)]<-colnames(train[i])
+  }
+}
+
+summary(train)
+
+vars<-as.data.frame(colnames(test))
+cvars<-c("Discreta","Continua","Categórica","Discreta","Discreta","Categórica","Categórica","Categórica","Categórica","Categórica","Categórica","Categórica","Categórica","Categórica","Categórica","Categórica","Categórica","Discreta","Discreta","Discreta","Discreta","Categórica","Categórica","Categórica","Categórica","Categórica","Discreta","Categórica","Categórica","Categórica","Categórica","Categórica","Categórica","Categórica","Discreta","Categórica","Discreta","Discreta","Discreta","Categórica","Categórica","Categórica","Discreta","Discreta","Discreta","Categórica","Categórica","Categórica","Categórica","Categórica","Categórica","Categórica","Categórica","Categórica","Categórica","Categórica","Discreta","Categórica","Categórica","Discreta","Categórica","Discreta","Discreta","Categórica","Categórica","Categórica","Discreta","Discreta","Discreta","Discreta","Discreta","Discreta","Categórica","Categórica","Categórica","Discreta","Discreta","Discreta","Categórica","Categórica")
+vars<-cbind(vars,cvars)
+colnames(vars)<-c("Variable","Tipo")
+kable(vars, "html") %>%
+  kable_styling(bootstrap_options = "striped", full_width = F, font_size = 16)
+```
+## Variables numéricas
+Se tienen `r ncol(ntrain)` variables numéricas dentro del dataset. Se tienen las siguientes correlaciones más altas. Se analizarán las que se correlacionas más con SalePrice.
+```{r}
+a<-ntrain[complete.cases(ntrain),]
+a<-as.data.frame(cor(a))
+# kable(a, "html") %>%
+#   kable_styling(bootstrap_options = "striped", full_width = F, font_size = 16)
+cors<-vector()
+b1<-vector()
+b2<-vector()
+b3<-vector()
+b4<-vector()
+for(i in 1:length(a)){
+  b1<-a[i]
+  b2[i]<-max(b1[b1<1])
+  b3[i]<-row.names(b1)[b1==b2[i]]
+  b4[i]<-colnames(a)[i]
+}
+cors<-as.data.frame(cbind(b4,b2,b3))
+colnames(cors)<-c("Variable","Correlacion","Variable Cor")
+
+kable(cors, "html",caption = "Correlaciones") %>%
+  kable_styling(bootstrap_options = "striped", full_width = F, font_size = 16)
+
+for(i in 2:(length(ntrain)-1)){
+    plot(ntrain[,i], ntrain$SalePrice, ylab = "Sale Price", xlab = colnames(ntrain)[i])
+}
+scors<-t(a["SalePrice",c(-1,-38)])
+
+kable(scors[order(scors, decreasing = T),], "html",caption = "Correlacion con Sale Price") %>%
+  kable_styling(bootstrap_options = "striped", full_width = F, font_size = 16)
+```
+## Variables categóricas
+Se observa seguido las variables categoricas que son `r ncol(ftrain)` dentro del dataset.
+```{r}
+for(i in 2:length(ftrain)){
+    plot(ftrain[i], main=colnames(ftrain)[i], col.main="red")
+}
+
+cors<-vector()
+b1<-vector()
+b2<-vector()
+
+for(i in 2:(length(ftrain))){
+  a<-ftrain[complete.cases(ftrain[,i]),c(1,i)]
+  b2[i-1]<-cor(as.numeric(a[,2]), train[a$Id,"SalePrice"])
+  b1[i-1]<-colnames(a)[2]
+}
+cors<-as.data.frame(cbind(b1,b2))
+colnames(cors)<-c("Variable","Correlacion")
+
+kable(cors[order(cors$Correlacion, decreasing = T),], "html",caption = "Variables Correlacionadas con SalePrice", row.names = F) %>%
+  kable_styling(bootstrap_options = "striped", full_width = F, font_size = 16)
+```
+#Clustering
+```{r}
+clusts<-train[,c("OverallQual", "GrLivArea", "GarageCars","GarageArea","TotalBsmtSF","Alley","Foundation","CentralAir","Electrical","PavedDrive")]
+for(i in 6:10){
+  a<-as.numeric(clusts[,i])
+  a[is.na(a)] <- 0
+  clusts[i]<-a
+}
+x <- (nrow(clusts[,1:10])-1)*sum(apply(clusts[,1:10],2,var))
+for (i in 1:8){
+  x[i] <- sum(kmeans(clusts[,1:10], centers=i)$withinss)
+}
+plot(1:8, x, type="b", xlab="Número de grupos",  ylab="grupos dentro de la suma de cuadrados", xlim = c(2,8))
+
+km<-kmeans(clusts,4)
+silkm<-silhouette(km$cluster,dist(clusts[1:10]))
+
+clusts$grupoK<-km$cluster
+train$grupoK<-km$cluster
+
+kgrupos<-data.frame(sort(table(clusts$grupoK)))
+names(kgrupos)[1]<-"Cantidad"
+```
+
+Se utilizaran las 5 variables más correlacionadas de las categóricas y numéricas, seguido se tiene un resumen de las variables que más resaltan de las casas. Se determinó que 4 grupos es el más indicado con la gráfica de codo. El método de la silueta dió como resultado `r mean(silkm[,3])`, el cuál es el valor más alto desde 2 grupos hasta 8. Ya que son muchas las variables que intervienen, el agrupar por solo unas cuantas variables no logra hacer grupos bien definidos. Se encontró que el grupo 4, se encuentran las casas más antiguas y las de menor valor, así mismo es el grupo más poblado. El grupo 2 es el menos poblado y el que tiene las casas de mayor valor.
+
+```{r}
+kable(kgrupos, "html",caption = "Grupos") %>%
+  kable_styling(bootstrap_options = "striped", full_width = F, font_size = 16)
+
+g1<- train[train$grupoK==1,]
+g2<- train[train$grupoK==2,]
+g3<- train[train$grupoK==3,]
+g4<- train[train$grupoK==4,]
+
+```
+###Grupo 1
+```{r}
+summary(g1[,c("SalePrice","OverallQual","LotArea","Neighborhood","YearBuilt","BldgType","HouseStyle")])
+```
+###Grupo 2
+```{r}
+summary(g2[,c("SalePrice","OverallQual","LotArea","Neighborhood","YearBuilt","BldgType","HouseStyle")])
+```
+###Grupo 3
+```{r}
+summary(g3[,c("SalePrice","OverallQual","LotArea","Neighborhood","YearBuilt","BldgType","HouseStyle")])
+```
+###Grupo 4
+```{r}
+summary(g4[,c("SalePrice","OverallQual","LotArea","Neighborhood","YearBuilt","BldgType","HouseStyle")])
+```
+
+#Análisis de Componetes Principales
+```{r}
+pcas<-train[,c("SalePrice","OverallQual","LotArea","Neighborhood","YearBuilt","BldgType","HouseStyle")]
+pcas[4]<-as.numeric(pcas[,4])
+pcas[6]<-as.numeric(pcas[,6])
+pcas[7]<-as.numeric(pcas[,7])
+pafDatos<-paf(as.matrix(pcas))
+
+summary(pafDatos)
+
+cortest.bartlett(pcas[,-1])
+
+cor(pcas,use = "pairwise.complete.obs")
+
+compPrinc<-prcomp(pcas, scale = T)
+summary(compPrinc)
+# compPrincPCA<-PCA(pcas,ncp=ncol(pcas), scale.unit = T)
+# summary(compPrincPCA)
+```
+Se econtró una adecuación a la muestra de `r pafDatos$KMO`, el test de esfericidad de Bartlett fue de `r pafDatos$Bartlett`. Así mismo se encontro que el test de correlació fue bastante pequeño, por lo que se puede usar el análisis factorial. Finalmente los principales componentes que resultaron fue el de OverallQuality, que se encontró anteriormente que estaba correlacionada con SalePrice.
+
+# Conclusiones
+* Se encontró que de las variables numéricas, las variables de área no estan correlacionadas con el precio de la casa
+* Se econtró con el análisis de grupos que existen casas de precio bajo son las más antiguas.
+* La variable de OverallQuality es un valor que describe en general la propiedad y es la que más correlacionada esta con el precio, por lo que para una predicción de precio esta es principal para el análisis.
